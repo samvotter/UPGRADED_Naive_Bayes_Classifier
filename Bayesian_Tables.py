@@ -1,3 +1,5 @@
+__author__ = 'Sam Van Otterloo'
+
 from nltk.corpus import stopwords
 '''
 stopwords may need to be downloaded: 
@@ -12,7 +14,7 @@ stopwords may need to be downloaded:
 #       OR
 #       2. A corpus of string data for the BayesEngine to classify
 # name is the unique identifier associated with a the data source
-class FrequencyTable:
+class BayesianTable:
 
     # name is the identity associated with the frequency table
     name: str
@@ -54,6 +56,18 @@ class FrequencyTable:
         for item in self.frequencies:
             self.proportions[item] = self.frequencies[item] / self.total
 
+    # adds an entire string into the frequency table and not just a single word
+    def add_string(
+            self,
+            string_to_be_added: str
+    ) -> None:
+        if isinstance(string_to_be_added, str):
+            broken_into_words = string_to_be_added.split()
+        else:
+            return
+        for word in broken_into_words:
+            self.add_word(word)
+
     # adds an individual string token into the frequency table
     #   new words are thoroughly cleaned before they enter the table
     def add_word(
@@ -66,15 +80,18 @@ class FrequencyTable:
         #       eliminate stopwords
         if isinstance(word, str):
             word = self.clean_input(word)
-            if word in stopwords.words("english"):
-                return
-            else:
-                if word in self.frequencies:
-                    self.frequencies[word] += 1
-                    self.total += 1
+            if len(word):
+                if word in stopwords.words("english"):
+                    return
                 else:
-                    self.frequencies[word] = 1
-                    self.total += 1
+                    if word in self.frequencies:
+                        self.frequencies[word] += 1
+                        self.total += 1
+                    else:
+                        self.frequencies[word] = 1
+                        self.total += 1
+            else:
+                return
 
     # Does the actual cleaning
     def clean_input(
@@ -85,11 +102,13 @@ class FrequencyTable:
         while not word[-1].isalnum():
             word = word[:-1]
             if not word:
-                return word
+                return ""
         while not word[0].isalnum():
             word = word[1:]
             if not word:
-                return word
+                return ""
+        if word[-2:] == "'s":
+            word = word[:-2]
         return word
 
 
