@@ -1,6 +1,7 @@
 __author__ = 'Sam Van Otterloo'
 
 from nltk.corpus import stopwords
+from typing import Dict
 '''
 stopwords may need to be downloaded: 
     nltk.setproxy()
@@ -21,30 +22,33 @@ class BayesianTable:
 
     def __init__(
             self,
-            name: str
+            name: str,
+            frequencies=None
     ):
         self.name = name
-        self.frequencies = {}
+        if frequencies:
+            self.frequencies = frequencies
+        else:
+            self.frequencies = {}
         self.proportions = {}
         self.total = 0
 
     # mostly for testing purposes to check under the hood at what items are being stored in the table
     def print_dict(
             self,
-            **kwargs
+            table: str = None
     ) -> None:
         options = {
-            "table": None,
             "frequencies": self.frequencies,
             "proportions": self.proportions
         }
-        for opt in kwargs:
-            if opt in options:
-                options[opt] = kwargs[opt]
 
-        print(f"Printing {self.name}'s {options['table']}: ")
-        for item in options[options['table']]:
-            print(f"\t{item}: {options[options['table']][item]}")
+        if table in options:
+            print(f"Printing {self.name}'s {table}: ")
+            for item in options[table]:
+                print(f"\t{item}: {options[table][item]}")
+        else:
+            print(f"ERROR! {table} must be 'frequencies' or 'proportions'")
 
     # turns the table from:
     #   [word]: #_of_occurences

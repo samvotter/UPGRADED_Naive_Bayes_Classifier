@@ -8,7 +8,6 @@ from collections import Counter
 from Math_Functions import squash
 from copy import deepcopy
 from pandas import DataFrame
-from numpy import nan
 
 # Performs the math and comparisons needed to make a classification prediction
 # To instantiate:
@@ -28,13 +27,6 @@ class BayesianEngine:
         for table in tables:
             self.tables[table.name] = table
         self.combined: set = set()
-        for table in tables:
-            for word in table.frequencies:
-                self.combined.add(word)
-        for word in self.combined:
-            for table in self.tables:
-                if word not in self.tables[table].frequencies:
-                    self.tables[table].frequencies[word] = 0
 
     # Mostly for testing purposes. Displays to the console the combined set of values from all tables
     def print_combined(
@@ -48,15 +40,26 @@ class BayesianEngine:
 
     # add <UNKNOWN> into each table dictionary and adjust the frequency values
     # so that the algorithm is capable of interpreting what to do with unknown values
-    def account_for_unknowns(
+    def format_tables(
             self
     ) -> None:
+        # make sure tables have valid totals
+        for table in self.tables:
+            if not self.tables[table].total:
+                for token in self.tables[table].frequencies:
+                    self.tables[table].total += self.tables[table].frequencies[token]
+
+        # combine the sets
+        for table in self.tables:
+            for word in self.tables[table].frequencies:
+                self.combined.add(word)
+
         for table in self.tables:
             print(f"\tBeginning table transform on: {table} . . .")
-            for word in self.combined:
-                self.tables[table].frequencies[word] = \
+            for word in self.tables[table].frequencies:
+                self.tables[table].proportions[word] = \
                     (self.tables[table].frequencies[word] + 1/self.tables[table].total)/(self.tables[table].total+1)
-            self.tables[table].frequencies["<UNKNOWN>"] = (1/self.tables[table].total)/(self.tables[table].total+1)
+            self.tables[table].proportions["__UNKNOWN__"] = (1/self.tables[table].total)/(self.tables[table].total+1)
             print(f"\t\tFinished transforms on: {table}.")
 
     # Given a FrequencyTable object, compare it against the initial segmentation buckets to make a classification
@@ -71,7 +74,13 @@ class BayesianEngine:
         for word in unknown_string_table.frequencies:
             for table in self.tables:
                 if word in self.tables[table].frequencies:
-                    guesses[table] += log(self.tables[table].frequencies[word])*unknown_string_table.frequencies[word]
+                    guesses[table] += log(self.tables[table].proportions[word]) * unknown_string_table.frequencies[
+                            word]
+                else:
+                    guesses[table] += log(self.tables[table].proportions["__UNKNOWN__"]) * \
+                                      unknown_string_table.frequencies[
+                                          word]
+        # rate and report the guess
         scores = guesses.values()
         maximum_key = max(guesses, key=guesses.get)
         maximum_val = max(scores)
@@ -100,31 +109,32 @@ class BayesianEngine:
             self,
             df: DataFrame,
             confidence_threshold: float = 0.0,
-            verbose:bool = False
+            verbose: bool = False,
+            null_is: str = None
     ) -> DataFrame:
         confidence_1 = 0
         confidence_2 = 0
         total = 0
         altered_data = deepcopy(df)
+        iterover = df[df[self.predicting].isnull() & (df[self.predicting] == null_is)]
         guess_distribution = {}
-        for index, row in df.iterrows():
-            if row[self.predicting] is nan:
-                row_guess = BayesianTable(index)
-                for column in row:
-                    row_guess.add_string(column)
-                guess = self.make_prediction(row_guess, verbose)
-                confidence_1 += guess[1]
-                confidence_2 += guess[2]
-                if guess[1] >= confidence_threshold:
-                    altered_data.at[index, self.predicting] = guess[0]
-                    if guess[0] in guess_distribution:
-                        guess_distribution[guess[0]] += 1
-                        total += 1
-                    else:
-                        guess_distribution[guess[0]] = 1
-                        total += 1
-                print(f"\t{row_guess.name}: True Value: {row[self.predicting]} ", end="")
-                print(f"Predicted: {guess}")
+        for index, row in iterover.iterrows():
+            row_guess = BayesianTable(index)
+            for column in row:
+                row_guess.add_string(column)
+            guess = self.make_prediction(row_guess, verbose)
+            confidence_1 += guess[1]
+            confidence_2 += guess[2]
+            if guess[1] >= confidence_threshold:
+                altered_data.at[index, self.predicting] = guess[0]
+                if guess[0] in guess_distribution:
+                    guess_distribution[guess[0]] += 1
+                    total += 1
+                else:
+                    guess_distribution[guess[0]] = 1
+                    total += 1
+            print(f"\t{row_guess.name}: True Value: {row[self.predicting]} ", end="")
+            print(f"Predicted: {guess}")
         print(f"\tGuess Distributions:")
         for guess in guess_distribution:
             print(f"\t\t{guess}: {guess_distribution[guess]}")
