@@ -23,7 +23,7 @@ class BayesianTable:
     def __init__(
             self,
             name: str,
-            frequencies=None
+            frequencies: Dict = None
     ):
         self.name = name
         if frequencies:

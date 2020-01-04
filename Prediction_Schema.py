@@ -17,6 +17,8 @@ from Mind_Web import MindManager
 def classify_dataframe(
         df: DataFrame,
         focus: str,
+        eng_load: bool = False,
+        use_case_context: str = None,
         confidence_threshold: float = 0.0,
         verbose: bool = False,
         null_is: str = None
@@ -29,13 +31,28 @@ def classify_dataframe(
     else:
         print(f"Found: {column_values}")
 
-        engine = instantiate_engine(df, column_values, focus)
+        if eng_load and use_case_context:
+            data = MindManager(
+                use_case_context
+            ).import_memory()
+
+            buckets = [
+                BayesianTable(
+                    bucket_name,
+                    data[bucket_name]
+                )
+                for bucket_name in data.keys()
+            ]
+            engine = BayesianEngine(focus, buckets)
+            engine.format_tables()
+        else:
+            engine = instantiate_engine(df, column_values, focus, null_is=null_is)
 
         if verbose:
             engine.print_combined()
 
         print(f"Making predictions for {engine.predicting} on the original data: ")
-        return engine.predict_from_pandas(df, confidence_threshold, verbose, null_is)
+        return engine.predict_from_pandas(df, confidence_threshold, verbose, null_is=null_is)
 
 
 def validate_classifier(
@@ -50,21 +67,21 @@ def validate_classifier(
     print(f"Found: {column_values}")
 
     if eng_load and use_case_context:
-        brain = MindManager()
+        data = MindManager(
+            use_case_context
+        ).import_memory()
+
         buckets = [
             BayesianTable(
-                bucket,
-                brain.import_memory(
-                    use_case_context,
-                    bucket
-                )
+                bucket_name,
+                data[bucket_name]
             )
-            for bucket in column_values if bucket is not nan and bucket != null_is
+            for bucket_name in column_values if bucket_name is not nan and bucket_name != null_is
         ]
         engine = BayesianEngine(focus, buckets)
         engine.format_tables()
     else:
-        engine = instantiate_engine(df, column_values, focus)
+        engine = instantiate_engine(df, column_values, focus, null_is=null_is)
 
     print(f"Making predictions for {engine.predicting} on the original data: ")
     engine.pandas_validation(df[df[focus].notnull() & (df[focus] != null_is)])
@@ -75,21 +92,28 @@ def column_set(
         df: DataFrame,
         focus: str
 ) -> set:
+    df = df[df[focus].notnull()]
     return set(df[focus].tolist())
 
 
 def instantiate_engine(
         df: DataFrame,
         focus_set: set,
-        focus: str
+        focus: str,
+        null_is: str = None
 ) -> BayesianEngine:
     print(f"Building Bayesian data tables and subsets . . .")
     buckets = {}
     subsets = {}
     for group in focus_set:
-        if group is not nan:
-            buckets[group] = BayesianTable(group)
-            subsets[group] = df[df[focus] == group]
+        if null_is:
+            if group is not nan and group != null_is:
+                buckets[group] = BayesianTable(group)
+                subsets[group] = df[df[focus] == group]
+        else:
+            if group is not nan:
+                buckets[group] = BayesianTable(group)
+                subsets[group] = df[df[focus] == group]
     print(f"Finished making tables and subsets.")
 
     print(f"Calculating frequency table values for . . .")
@@ -116,3 +140,4 @@ def instantiate_engine(
     engine.format_tables()
     print(f"Finished calculating proportions.")
     return engine
+

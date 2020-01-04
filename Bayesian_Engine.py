@@ -116,7 +116,7 @@ class BayesianEngine:
         confidence_2 = 0
         total = 0
         altered_data = deepcopy(df)
-        iterover = df[df[self.predicting].isnull() & (df[self.predicting] == null_is)]
+        iterover = df[df[self.predicting].isnull() | (df[self.predicting] == null_is)]
         guess_distribution = {}
         for index, row in iterover.iterrows():
             row_guess = BayesianTable(index)
@@ -165,6 +165,6 @@ class BayesianEngine:
                     total += 1
                 else:
                     total += 1
-        print(f"This classification attempt was {(round(correct / total, 2) * 100)}% successful")
+        print(f"This classification attempt was {(round(correct / total, 4) * 100)}% successful")
         print(f"Average General Confidence: {round(confidence_1 / total, 3)}")
         print(f"Average Specific Confidence: {round(confidence_2 / total, 3)}")
